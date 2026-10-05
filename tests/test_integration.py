@@ -8,7 +8,7 @@ import sys
 import tempfile
 import unittest
 
-APP = Path(__file__).resolve().parents[1] / "build/Puertos.app/Contents/MacOS/Puertos"
+APP = Path(__file__).resolve().parents[1] / "build/MyPorts.app/Contents/MacOS/MyPorts"
 FIXTURE = r'''
 import json, os, signal, socket, sys
 mode = sys.argv[1]

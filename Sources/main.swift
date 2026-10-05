@@ -44,8 +44,8 @@ struct Service: Codable, Equatable {
             && !directory.isEmpty && directory != "/" && directory != home
     }
     var projectName: String {
-        if directory.isEmpty || directory == "/" { return "Sin carpeta de proyecto" }
-        if directory == FileManager.default.homeDirectoryForCurrentUser.path { return "Carpeta personal" }
+        if directory.isEmpty || directory == "/" { return "No project folder" }
+        if directory == FileManager.default.homeDirectoryForCurrentUser.path { return "Home folder" }
         return URL(fileURLWithPath: directory).lastPathComponent
     }
 }
@@ -54,7 +54,7 @@ func scan() throws -> [Service] {
     var count: Int32 = 0
     let pointer = ports_scan(&count)
     defer { ports_free(pointer) }
-    guard count >= 0 else { throw NSError(domain: "Puertos", code: 1, userInfo: [NSLocalizedDescriptionKey: "No se pudieron consultar los procesos."]) }
+    guard count >= 0 else { throw NSError(domain: "MyPorts", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not inspect processes."]) }
     guard let pointer else { return [] }
     var groups: [String: Service] = [:]
     for record in UnsafeBufferPointer(start: pointer, count: Int(count)) {
@@ -82,7 +82,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--stop") {
     let args = Array(CommandLine.arguments.dropFirst(index + 1))
     guard args.count >= 4, let pid = Int32(args[0]), let sec = UInt64(args[1]),
         let usec = UInt64(args[2]), let port = UInt16(args[3]), port > 0 else {
-        fputs("Uso: --stop PID START_SEC START_USEC PORT [--force]\n", stderr); exit(2)
+        fputs("Usage: --stop PID START_SEC START_USEC PORT [--force]\n", stderr); exit(2)
     }
     let result = ports_stop(pid, sec, usec, port, args.contains("--force") ? 1 : 0)
     if result != 0 { fputs("\(String(cString: strerror(result)))\n", stderr) }
@@ -153,14 +153,14 @@ class ServiceButton: NSButton {
 enum ProcessTime {
     static let shortDate: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale(identifier: "en_GB")
         formatter.timeZone = .autoupdatingCurrent
-        formatter.dateFormat = "dd/MM/yy HH:mm"
+        formatter.dateFormat = "dd MMM yy HH:mm"
         return formatter
     }()
     static let fullDate: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale(identifier: "en_GB")
         formatter.timeZone = .autoupdatingCurrent
         formatter.dateStyle = .long
         formatter.timeStyle = .medium
@@ -212,7 +212,7 @@ final class ServiceCard: NSView {
     let surface = CardSurface()
     let icon = NSImageView()
     let name = NSTextField(labelWithString: "")
-    let state = NSTextField(labelWithString: "En escucha")
+    let state = NSTextField(labelWithString: "Listening")
     let port = ServiceButton()
     let location = NSTextField(labelWithString: "")
     let project = NSTextField(labelWithString: "")
@@ -258,9 +258,9 @@ final class ServiceCard: NSView {
         elapsed.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         elapsed.textColor = .secondaryLabelColor
         elapsed.alignment = .right
-        elapsed.setAccessibilityLabel("Tiempo activo del proceso")
+        elapsed.setAccessibilityLabel("Process uptime")
         divider.boxType = .separator
-        open.title = "Abrir ↗"
+        open.title = "Open ↗"
         open.bezelStyle = .rounded
         open.controlSize = .small
         open.font = .systemFont(ofSize: 12, weight: .medium)
@@ -271,7 +271,7 @@ final class ServiceCard: NSView {
         stop.font = .systemFont(ofSize: 12, weight: .medium)
         stop.target = dashboard
         stop.action = #selector(Dashboard.stopService(_:))
-        more.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "Opciones del servicio")
+        more.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "Service options")
         more.isBordered = false
         more.target = dashboard
         more.action = #selector(Dashboard.showServiceOptions(_:))
@@ -299,30 +299,30 @@ final class ServiceCard: NSView {
             icon.image = NSImage(systemSymbolName: service.isProject ? "terminal" : "app", accessibilityDescription: nil)
             icon.contentTintColor = .secondaryLabelColor
             port.title = ":\(service.port)"
-            port.toolTip = "Abrir \(service.url().absoluteString)"
-            port.setAccessibilityLabel("Abrir puerto \(service.port) en el navegador")
+            port.toolTip = "Open \(service.url().absoluteString)"
+            port.setAccessibilityLabel("Open port \(service.port) in browser")
             port.menu = menuFor(service)
             project.stringValue = service.projectName
             location.stringValue = "\(service.host):\(service.port)"
-            directory.stringValue = service.shortDirectory.isEmpty ? "Carpeta no disponible" : service.shortDirectory
+            directory.stringValue = service.shortDirectory.isEmpty ? "Folder unavailable" : service.shortDirectory
             directory.toolTip = service.directory
             metadata.stringValue = "PID \(service.pid) · \(service.addresses.joined(separator: ", "))"
             metadata.toolTip = metadata.stringValue
-            started.stringValue = "Desde \(ProcessTime.shortDate.string(from: service.startedAt))"
-            started.toolTip = "Inicio del proceso: \(ProcessTime.fullDate.string(from: service.startedAt))"
+            started.stringValue = "Since \(ProcessTime.shortDate.string(from: service.startedAt))"
+            started.toolTip = "Process started: \(ProcessTime.fullDate.string(from: service.startedAt))"
             [port, open, stop, more].forEach { $0.service = service }
-            open.setAccessibilityLabel("Abrir \(service.name), puerto \(service.port)")
-            more.setAccessibilityLabel("Opciones de \(service.name), puerto \(service.port)")
-            open.toolTip = "Abrir con HTTP en el navegador"
-            more.toolTip = "HTTPS, copiar URL y mostrar carpeta"
+            open.setAccessibilityLabel("Open \(service.name), port \(service.port)")
+            more.setAccessibilityLabel("Options for \(service.name), port \(service.port)")
+            open.toolTip = "Open with HTTP in browser"
+            more.toolTip = "HTTPS, copy URL and reveal folder"
         }
         let canForce = stoppingSince.map { Date().timeIntervalSince($0) >= 4 } ?? false
-        state.stringValue = stoppingSince == nil ? (service.stoppable ? "En escucha" : "Protegido") : "Deteniendo…"
+        state.stringValue = stoppingSince == nil ? (service.stoppable ? "Listening" : "Protected") : "Stopping…"
         state.textColor = stoppingSince == nil ? (service.stoppable ? .systemGreen : .secondaryLabelColor) : .systemOrange
-        stop.title = stoppingSince == nil ? "Detener" : (canForce ? "Forzar…" : "Parando…")
+        stop.title = stoppingSince == nil ? "Stop" : (canForce ? "Force quit…" : "Stopping…")
         stop.isEnabled = service.stoppable && (stoppingSince == nil || canForce)
-        stop.toolTip = service.stoppable ? "Detener el proceso \(service.pid) y todos sus puertos" : "Proceso del sistema o de otro usuario"
-        stop.setAccessibilityLabel("\(stop.title) \(service.name), puerto \(service.port)")
+        stop.toolTip = service.stoppable ? "Stop process \(service.pid) and all its ports" : "System process or another user’s process"
+        stop.setAccessibilityLabel("\(stop.title) \(service.name), port \(service.port)")
         updateActivity(at: Date())
         needsLayout = true
     }
@@ -331,7 +331,7 @@ final class ServiceCard: NSView {
         guard let service = represented else { return }
         let duration = ProcessTime.elapsed(since: service.startedAt, at: now)
         if elapsed.stringValue != duration { elapsed.stringValue = duration }
-        elapsed.toolTip = "Tiempo activo del proceso: \(duration)"
+        elapsed.toolTip = "Process uptime: \(duration)"
     }
 
     func menuFor(_ service: Service) -> NSMenu? { (port.target as? Dashboard)?.serviceMenu(service) }
@@ -402,13 +402,13 @@ final class DashboardMetric: NSView {
 final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate {
     let grid = CardsGrid()
     let scroll = NSScrollView()
-    let scope = NSSegmentedControl(labels: ["Todos", "Proyectos", "Apps"], trackingMode: .selectOne, target: nil, action: nil)
+    let scope = NSSegmentedControl(labels: ["All", "Projects", "Apps"], trackingMode: .selectOne, target: nil, action: nil)
     var cardsByID: [String: ServiceCard] = [:]
-    let serviceMetric = DashboardMetric("Puertos activos")
-    let processMetric = DashboardMetric("Procesos")
-    let projectMetric = DashboardMetric("Carpetas de proyectos")
+    let serviceMetric = DashboardMetric("Active ports")
+    let processMetric = DashboardMetric("Processes")
+    let projectMetric = DashboardMetric("Project folders")
     let search = NSSearchField()
-    let footer = NSTextField(labelWithString: "Consultando puertos…")
+    let footer = NSTextField(labelWithString: "Checking ports…")
     let empty = NSTextField(labelWithString: "")
     let countLabel = NSTextField(labelWithString: "")
     let settingsButton = ServiceButton()
@@ -425,23 +425,23 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
 
     override func loadView() {
         view = NSView(frame: NSRect(x: 0, y: 0, width: 1040, height: 720))
-        let title = NSTextField(labelWithString: "Puertos")
+        let title = NSTextField(labelWithString: "MyPorts")
         title.font = .systemFont(ofSize: 24, weight: .semibold)
         countLabel.font = .systemFont(ofSize: 12)
         countLabel.textColor = .secondaryLabelColor
-        search.placeholderString = "Buscar puerto, proceso o carpeta"
+        search.placeholderString = "Search port, process or folder"
         search.delegate = self
-        search.setAccessibilityLabel("Buscar servicios")
-        let refresh = ServiceButton(image: NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Actualizar ahora")!, target: self, action: #selector(refreshNow))
+        search.setAccessibilityLabel("Search services")
+        let refresh = ServiceButton(image: NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Refresh now")!, target: self, action: #selector(refreshNow))
         refresh.bezelStyle = .texturedRounded
-        refresh.toolTip = "Actualizar ahora (⌘R)"
+        refresh.toolTip = "Refresh now (⌘R)"
         refresh.keyEquivalent = "r"
         refresh.keyEquivalentModifierMask = .command
-        settingsButton.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Opciones")
+        settingsButton.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
         settingsButton.bezelStyle = .texturedRounded
         settingsButton.target = self
         settingsButton.action = #selector(showSettings)
-        settingsButton.toolTip = "Opciones"
+        settingsButton.toolTip = "Settings"
         let header = NSStackView(views: [title, NSView(), refresh, settingsButton])
         header.orientation = .horizontal
         header.spacing = 12
@@ -453,7 +453,7 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
         scope.target = self
         scope.action = #selector(scopeChanged)
         scope.controlSize = .regular
-        scope.setAccessibilityLabel("Filtrar servicios")
+        scope.setAccessibilityLabel("Filter services")
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
@@ -563,7 +563,7 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
                     let now = Date()
                     self.grid.cards.forEach { $0.updateActivity(at: now) }
                     let time = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-                    self.footer.stringValue = "TCP en escucha · cada \(Int(self.interval)) s · \(time) · sin sondeos al cerrar"
+                    self.footer.stringValue = "Listening TCP · every \(Int(self.interval)) s · \(time) · paused when hidden"
                 case .failure(let error): self.footer.stringValue = error.localizedDescription
                 }
             }
@@ -578,7 +578,7 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
         serviceMetric.value.stringValue = String(Set(visible.map(\.port)).count)
         processMetric.value.stringValue = String(Set(visible.map(\.pid)).count)
         projectMetric.value.stringValue = String(Set(visible.filter(\.isProject).map(\.directory)).count)
-        countLabel.stringValue = "\(filtered.count) \(filtered.count == 1 ? "servicio" : "servicios")" + (scope.selectedSegment == 1 ? " de proyectos" : (scope.selectedSegment == 2 ? " de aplicaciones" : " en escucha"))
+        countLabel.stringValue = "\(filtered.count) \(filtered.count == 1 ? "service" : "services")" + (scope.selectedSegment == 1 ? " in projects" : (scope.selectedSegment == 2 ? " in apps" : " listening"))
         let ids = Set(filtered.map(\.id))
         for (id, card) in cardsByID where !ids.contains(id) { card.removeFromSuperview() }
         cardsByID = cardsByID.filter { ids.contains($0.key) }
@@ -597,7 +597,7 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
         grid.layoutSubtreeIfNeeded()
         synchronizeHoverStates()
         empty.isHidden = !filtered.isEmpty
-        empty.stringValue = query.isEmpty ? (visible.isEmpty ? "No hay servicios locales en escucha.\nAl arrancar uno, aparecerá aquí automáticamente." : "No hay servicios en este filtro.") : "No hay servicios que coincidan con «\(search.stringValue)»."
+        empty.stringValue = query.isEmpty ? (visible.isEmpty ? "No local services are listening.\nStart one and it will appear here automatically." : "No services in this filter.") : "No services match “\(search.stringValue)”."
     }
     func controlTextDidChange(_ obj: Notification) { applyFilter() }
     @objc func scopeChanged() { applyFilter() }
@@ -609,7 +609,7 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
     func serviceMenu(_ service: Service) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        for (title, action) in [("Abrir con HTTP", #selector(openHTTP(_:))), ("Abrir con HTTPS", #selector(openHTTPS(_:))), ("Copiar URL", #selector(copyURL(_:))), ("Mostrar carpeta en Finder", #selector(showFolder(_:)))] {
+        for (title, action) in [("Open with HTTP", #selector(openHTTP(_:))), ("Open with HTTPS", #selector(openHTTPS(_:))), ("Copy URL", #selector(copyURL(_:))), ("Show folder in Finder", #selector(showFolder(_:)))] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
             item.representedObject = service
@@ -637,11 +637,11 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
         let force = stopping[service.id] != nil
         let ports = services.filter { $0.pid == service.pid && $0.startSec == service.startSec && $0.startUsec == service.startUsec }.map { String($0.port) }.joined(separator: ", ")
         let alert = NSAlert()
-        alert.messageText = force ? "¿Forzar el cierre de \(service.name)?" : "¿Detener \(service.name)?"
-        alert.informativeText = "Se \(force ? "forzará el cierre" : "solicitará el cierre") del proceso \(service.pid). Afectará a todos sus puertos: \(ports)." + (force ? " Puede perder trabajo sin guardar." : " Si un supervisor lo reinicia, volverá a aparecer.")
+        alert.messageText = force ? "Force quit \(service.name)?" : "Stop \(service.name)?"
+        alert.informativeText = "This will \(force ? "force quit" : "request shutdown of") process \(service.pid), affecting all its ports: \(ports)." + (force ? " Unsaved work may be lost." : " If a supervisor restarts it, it will reappear.")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: force ? "Forzar cierre" : "Detener proceso")
-        alert.addButton(withTitle: "Cancelar")
+        alert.addButton(withTitle: force ? "Force quit" : "Stop process")
+        alert.addButton(withTitle: "Cancel")
         alert.buttons[0].keyEquivalent = ""
         alert.buttons[1].keyEquivalent = "\u{1b}"
         guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -652,7 +652,7 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
             applyFilter()
         } else if result != ESRCH && result != ESTALE {
             let failure = NSAlert()
-            failure.messageText = "No se pudo detener el proceso"
+            failure.messageText = "Could not stop the process"
             failure.informativeText = String(cString: strerror(result))
             failure.runModal()
         }
@@ -662,27 +662,27 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
     @objc func showSettings() {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        let login = NSMenuItem(title: "Abrir al iniciar sesión", action: #selector(toggleLogin), keyEquivalent: "")
+        let login = NSMenuItem(title: "Launch at login", action: #selector(toggleLogin), keyEquivalent: "")
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         login.target = self
         menu.addItem(login)
-        for (title, action, checked) in [("Mostrar servicios de macOS", #selector(toggleSystem), showSystem), ("Solo procesos de mi usuario", #selector(toggleUser), ownOnly)] {
+        for (title, action, checked) in [("Show macOS services", #selector(toggleSystem), showSystem), ("Only my user’s processes", #selector(toggleUser), ownOnly)] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.state = checked ? .on : .off
             item.target = self
             menu.addItem(item)
         }
-        let update = NSMenuItem(title: "Actualizar cada…", action: nil, keyEquivalent: "")
+        let update = NSMenuItem(title: "Refresh every…", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
         for seconds in [1, 2, 5, 10] {
-            let item = NSMenuItem(title: "\(seconds) segundos", action: #selector(changeInterval(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: "\(seconds) seconds", action: #selector(changeInterval(_:)), keyEquivalent: "")
             item.tag = seconds; item.target = self; item.state = Int(interval) == seconds ? .on : .off
             submenu.addItem(item)
         }
         update.submenu = submenu
         menu.addItem(update)
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Salir de Puertos", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit MyPorts", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         menu.addItem(quit)
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: settingsButton.bounds.height + 4), in: settingsButton)
@@ -697,7 +697,7 @@ final class Dashboard: NSViewController, NSSearchFieldDelegate, NSWindowDelegate
             if SMAppService.mainApp.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
         } catch {
             let alert = NSAlert()
-            alert.messageText = "No se pudo cambiar el inicio automático"
+            alert.messageText = "Could not change launch at login"
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
@@ -712,9 +712,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = status.button {
             button.image = portIcon(size: 18, application: false)
-            button.image?.accessibilityDescription = "Puertos locales"
+            button.image?.accessibilityDescription = "Local ports"
             button.image?.isTemplate = true
-            button.toolTip = "Puertos · servicios locales"
+            button.toolTip = "MyPorts · local services"
             button.target = self
             button.action = #selector(toggleDashboard)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -722,20 +722,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let mainMenu = NSMenu()
         let root = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "Salir de Puertos", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Quit MyPorts", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         root.submenu = appMenu
         mainMenu.addItem(root)
-        let edit = NSMenuItem(title: "Edición", action: nil, keyEquivalent: "")
-        let editMenu = NSMenu(title: "Edición")
-        editMenu.addItem(withTitle: "Cortar", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copiar", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Pegar", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Seleccionar todo", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        let edit = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         edit.submenu = editMenu
         mainMenu.addItem(edit)
-        let windowRoot = NSMenuItem(title: "Ventana", action: nil, keyEquivalent: "")
-        let windowMenu = NSMenu(title: "Ventana")
-        let minimize = NSMenuItem(title: "Minimizar", action: #selector(minimizeDashboard(_:)), keyEquivalent: "w")
+        let windowRoot = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
+        let windowMenu = NSMenu(title: "Window")
+        let minimize = NSMenuItem(title: "Minimize", action: #selector(minimizeDashboard(_:)), keyEquivalent: "w")
         minimize.keyEquivalentModifierMask = .command
         minimize.target = self
         windowMenu.addItem(minimize)
@@ -754,7 +754,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func showDashboard() {
         if window == nil {
             window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-            window.title = "Puertos"
+            window.title = "MyPorts"
             window.contentViewController = dashboard
             window.delegate = dashboard
             window.minSize = NSSize(width: 720, height: 480)
@@ -770,10 +770,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func toggleDashboard() {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
-            let open = NSMenuItem(title: "Abrir Puertos", action: #selector(openDashboard), keyEquivalent: "")
+            let open = NSMenuItem(title: "Open MyPorts", action: #selector(openDashboard), keyEquivalent: "")
             open.target = self
             menu.addItem(open)
-            let quit = NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+            let quit = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
             quit.target = NSApp
             menu.addItem(quit)
             if let button = status.button { menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height), in: button) }
